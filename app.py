@@ -14,7 +14,7 @@ from dash import dcc, html, Input, Output
 # ──────────────────────────────────────────────────────────────────────────────
 # 1.  DATA
 # ──────────────────────────────────────────────────────────────────────────────
-FILE_PATH = "Dataset_VisContest_Rapid_Alloy_development_v3.txt"
+FILE_PATH = "https://drive.google.com/uc?export=download&id=1lBvU-MvbZbUM3UbrW_AeCbZ5-KcxCE6e"
 
 COLUMNS_TO_PLOT = [
     "Al", "Si", "Cu", "Mg", "Fe", "delta_T", "eut. frac.[%]",
