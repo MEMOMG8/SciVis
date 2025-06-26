@@ -13,28 +13,35 @@ from dash import dcc, html, Input, Output
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 1.  DATA
+# ──────────────────────────────────────────────────────────────────────────────
 FILE_PATH = "Dataset_VisContest_Rapid_Alloy_development_v3.txt"
 
-USE_COLS = COLUMNS_TO_PLOT + ["CSC"]      
+COLUMNS_TO_PLOT = [
+    "Al", "Si", "Cu", "Mg", "Fe", "delta_T", "eut. frac.[%]",
+    "YS(MPa)", "hardness(Vickers)",
+    "Therm.conductivity(W/(mK))", "Therm. diffusivity(m2/s)"
+]
 
-# ↓ replace the old read_csv + filter block
+# read only the needed columns and cast to float32 → saves a lot of RAM
+USE_COLS = COLUMNS_TO_PLOT + ["CSC"]
 df = (
-    pd.read_csv(FILE_PATH, sep="\t", usecols=USE_COLS)   
-      .astype("float32")                                 
+    pd.read_csv(FILE_PATH, sep="\t", usecols=USE_COLS)
+      .astype("float32")
 )
+
 df_filtered = df.dropna().reset_index(drop=True)
 df_filtered["CSC_clipped"] = df_filtered["CSC"].clip(0, 1)
 
 # PCA -------------------------------------------------------------------------
-scaler = StandardScaler()
+scaler      = StandardScaler()
 data_scaled = scaler.fit_transform(df_filtered[COLUMNS_TO_PLOT])
 
-pca = PCA(n_components=2)
-pca_result = pca.fit_transform(data_scaled)
+pca         = PCA(n_components=2)
+pca_result  = pca.fit_transform(data_scaled)
 
 pc1_var, pc2_var = pca.explained_variance_ratio_[:2] * 100
-components  = pca.components_.T
-ARROW_SCALE = 3
+components       = pca.components_.T
+ARROW_SCALE      = 3
 
 MIN_VALS = df_filtered[COLUMNS_TO_PLOT].min()
 MAX_VALS = df_filtered[COLUMNS_TO_PLOT].max()
@@ -42,8 +49,8 @@ MAX_VALS = df_filtered[COLUMNS_TO_PLOT].max()
 # ──────────────────────────────────────────────────────────────────────────────
 # 2.  DASH LAYOUT
 # ──────────────────────────────────────────────────────────────────────────────
-app = dash.Dash(__name__)
-server = app.server
+app    = dash.Dash(__name__)
+server = app.server  # so Render can find it
 
 app.layout = html.Div(
     [
@@ -65,7 +72,7 @@ app.layout = html.Div(
                 dcc.RadioItems(
                     id="data-mode",
                     options=[
-                        {"label": "All Points", "value": "all"},
+                        {"label": "All Points",   "value": "all"},
                         {"label": "Vectors Only", "value": "vectors"},
                     ],
                     value="all",
@@ -81,19 +88,19 @@ app.layout = html.Div(
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 3-A. PCA & RADAR
+# 3-A. PCA & RADAR CALLBACK
 # ──────────────────────────────────────────────────────────────────────────────
 @app.callback(
-    Output("pca-graph", "figure"),
+    Output("pca-graph",   "figure"),
     Output("radar-chart", "figure"),
     Input("feature-checklist", "value"),
-    Input("data-mode", "value"),
-    Input("pca-graph", "hoverData"),
+    Input("data-mode",         "value"),
+    Input("pca-graph",         "hoverData"),
     prevent_initial_call=False,
 )
 def update_pca_and_radar(selected_features, mode, hoverData):
 
-    # ╭─ PCA ───────────────────────────────────────────────────────────────╮
+    # ── PCA plot ───────────────────────────────────────────────────────────
     pca_fig = go.Figure()
 
     if mode != "vectors":
@@ -138,18 +145,16 @@ def update_pca_and_radar(selected_features, mode, hoverData):
         plot_bgcolor="white",
         margin=dict(l=60, r=60, t=50, b=60),
     )
-    # ╰──────────────────────────────────────────────────────────────────────╯
 
-    # ╭─ Determine hovered index ───────────────────────────────────────────╮
+    # ── which point is hovered? ────────────────────────────────────────────
     idx = 0
     if hoverData and hoverData.get("points"):
         try:
             idx = int(hoverData["points"][0]["text"])
         except Exception:
             idx = 0
-    # ╰──────────────────────────────────────────────────────────────────────╯
 
-    # ╭─ RADAR ──────────────────────────────────────────────────────────────╮
+    # ── RADAR plot ─────────────────────────────────────────────────────────
     real_vals   = df_filtered.loc[idx, COLUMNS_TO_PLOT]
     scaled_vals = ((real_vals - MIN_VALS) / (MAX_VALS - MIN_VALS)).fillna(0)
 
@@ -170,18 +175,16 @@ def update_pca_and_radar(selected_features, mode, hoverData):
         )
     )
 
-    # ——— stats cards ———
+    # stats cards around the circle
     for k, feat in enumerate(COLUMNS_TO_PLOT):
         angle_deg = k * 360 / len(COLUMNS_TO_PLOT)
         angle_rad = math.radians(angle_deg)
 
-        # alternate two rings to avoid crowding
         r_card   = 1.25 if k % 2 == 0 else 1.40
         x_paper  = 0.5 + 0.5 * r_card * math.cos(angle_rad)
         y_paper  = 0.5 + 0.5 * r_card * math.sin(angle_rad)
 
-        # orient text block outward
-        xanchor = "left"  if -90 < angle_deg < 90  else "right"
+        xanchor = "left"   if -90 < angle_deg < 90 else "right"
         yanchor = "bottom" if   0 < angle_deg < 180 else "top"
 
         mid_val = 0.5 * (MIN_VALS[feat] + MAX_VALS[feat])
@@ -200,7 +203,6 @@ def update_pca_and_radar(selected_features, mode, hoverData):
             showarrow=False,
             font=dict(size=9, color="black"),
             align="left",
-            textangle=0,
             xanchor=xanchor,
             yanchor=yanchor,
             bgcolor="rgba(255,255,255,0.85)",
@@ -217,13 +219,12 @@ def update_pca_and_radar(selected_features, mode, hoverData):
         showlegend=False,
         margin=dict(l=60, r=60, t=20, b=20),
     )
-    # ╰──────────────────────────────────────────────────────────────────────╯
 
     return pca_fig, radar_fig
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# 3-B. PARALLEL-COORDS (unchanged)
+# 3-B. PARALLEL COORDS CALLBACK
 # ──────────────────────────────────────────────────────────────────────────────
 @app.callback(
     Output("parallel-graph", "figure"),
@@ -233,8 +234,9 @@ def update_pca_and_radar(selected_features, mode, hoverData):
 def update_parallel_coordinates(selection):
 
     if selection and selection.get("points"):
-        sel_idx = [int(p["text"]) for p in selection["points"] if "text" in p]
-        df_sel, df_rest = df_filtered.iloc[sel_idx], df_filtered.drop(sel_idx)
+        sel_idx  = [int(p["text"]) for p in selection["points"] if "text" in p]
+        df_sel   = df_filtered.iloc[sel_idx]
+        df_rest  = df_filtered.drop(sel_idx)
 
         fig = px.parallel_coordinates(
             df_rest,
@@ -254,6 +256,7 @@ def update_parallel_coordinates(selection):
         for tr in fig_sel.data:
             fig.add_trace(tr)
         title = f"Parallel-Coordinates — {len(sel_idx)} Alloy(s) Selected"
+
     else:
         fig = px.parallel_coordinates(
             df_filtered,
