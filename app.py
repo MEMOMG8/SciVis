@@ -15,14 +15,14 @@ from dash import dcc, html, Input, Output
 # 1.  DATA
 FILE_PATH = "Dataset_VisContest_Rapid_Alloy_development_v3.txt"
 
-COLUMNS_TO_PLOT = [
-    "Al", "Si", "Cu", "Mg", "Fe", "delta_T", "eut. frac.[%]",
-    "YS(MPa)", "hardness(Vickers)",
-    "Therm.conductivity(W/(mK))", "Therm. diffusivity(m2/s)"
-]
+USE_COLS = COLUMNS_TO_PLOT + ["CSC"]      
 
-df = pd.read_csv(FILE_PATH, sep="\t")
-df_filtered = df[COLUMNS_TO_PLOT + ["CSC"]].dropna().reset_index(drop=True)
+# ↓ replace the old read_csv + filter block
+df = (
+    pd.read_csv(FILE_PATH, sep="\t", usecols=USE_COLS)   
+      .astype("float32")                                 
+)
+df_filtered = df.dropna().reset_index(drop=True)
 df_filtered["CSC_clipped"] = df_filtered["CSC"].clip(0, 1)
 
 # PCA -------------------------------------------------------------------------
